@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
+from matplotlib import pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -81,79 +82,79 @@ def make_seed(size, n_channels):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-            description="Training script for the Celluar Automata"
+        description="Training script for the Celluar Automata"
     )
     parser.add_argument("img", type=str, help="Path to the image we want to reproduce")
 
     parser.add_argument(
-            "-b",
-            "--batch-size",
-            type=int,
-            default=8,
-            help="Batch size. Samples will always be taken randomly from the pool."
+        "-b",
+        "--batch-size",
+        type=int,
+        default=8,
+        help="Batch size. Samples will always be taken randomly from the pool."
     )
     parser.add_argument(
-            "-d",
-            "--device",
-            type=str,
-            default="cpu",
-            help="Device to use",
-            choices=("cpu", "cuda", "mps"),
+        "-d",
+        "--device",
+        type=str,
+        default="cpu",
+        help="Device to use",
+        choices=("cpu", "cuda", "mps"),
     )
     parser.add_argument(
-            "-e",
-            "--eval-frequency",
-            type=int,
-            default=500,
-            help="Evaluation frequency.",
+        "-e",
+        "--eval-frequency",
+        type=int,
+        default=500,
+        help="Evaluation frequency.",
     )
     parser.add_argument(
-            "-i",
-            "--eval-iterations",
-            type=int,
-            default=300,
-            help="Number of iterations when evaluating.",
+        "-i",
+        "--eval-iterations",
+        type=int,
+        default=300,
+        help="Number of iterations when evaluating.",
     )
     parser.add_argument(
-            "-n",
-            "--n-batches",
-            type=int,
-            default=5000,
-            help="Number of batches to train for.",
+        "-n",
+        "--n-batches",
+        type=int,
+        default=5000,
+        help="Number of batches to train for.",
     )
     parser.add_argument(
-            "-c",
-            "--n-channels",
-            type=int,
-            default=16,
-            help="Number of channels of the input tensor",
+        "-c",
+        "--n-channels",
+        type=int,
+        default=16,
+        help="Number of channels of the input tensor",
     )
     parser.add_argument(
-            "-l",
-            "--logdir",
-            type=str,
-            default="logs",
-            help="Folder where all the logs and outputs are saved.",
+        "-l",
+        "--logdir",
+        type=str,
+        default="logs",
+        help="Folder where all the logs and outputs are saved.",
     )
     parser.add_argument(
-            "-p",
-            "--padding",
-            type=int,
-            default=16,
-            help="Padding. The shape after padding is (h + 2 * p, w + 2 * p).",
+        "-p",
+        "--padding",
+        type=int,
+        default=16,
+        help="Padding. The shape after padding is (h + 2 * p, w + 2 * p).",
     )
     parser.add_argument(
-            "--pool-size",
-            type=int,
-            default=1024,
-            help="Size of the training pool",
+        "--pool-size",
+        type=int,
+        default=1024,
+        help="Size of the training pool",
     )
     parser.add_argument(
-            "-s",
-            "--size",
-            type=int,
-            default=40,
-            help="Image size",
+        "-s",
+        "--size",
+        type=int,
+        default=40,
+        help="Image size",
     )
     # Parse arguments
     args = parser.parse_args()
@@ -184,9 +185,12 @@ def main(argv=None):
     seed = nn.functional.pad(seed, (p, p, p, p), "constant", 0)
     pool = seed.clone().repeat(args.pool_size, 1, 1, 1)
 
+    # for storing the evaluation images
+    subplots = []
+
     for it in tqdm(range(args.n_batches)):
         batch_ixs = np.random.choice(
-                args.pool_size, args.batch_size, replace=False
+            args.pool_size, args.batch_size, replace=False
         ).tolist()
 
         x = pool[batch_ixs]
@@ -209,17 +213,38 @@ def main(argv=None):
         pool[argmax_pool] = seed.clone()
         pool[remaining_pool] = x[remaining_batch].detach()
 
-        if it % args.eval_frequency == 0:
+        if it % args.eval_frequency == 0 or it == args.n_batches - 1:
             x_eval = seed.clone()  # (1, n_channels, size, size)
 
             eval_video = torch.empty(1, args.eval_iterations, 3, *x_eval.shape[2:])
-            
+
+            x_eval_out = None  # to be used for displaying in matplotlib
             for it_eval in range(args.eval_iterations):
                 x_eval = model(x_eval)
                 x_eval_out = to_rgb(x_eval[:, :4].detach().cpu())
                 eval_video[0, it_eval] = x_eval_out
 
+            plt.imshow(x_eval_out[0].permute(1, 2, 0))
+            plt.title(f"iteration {it}")
+            plt.show()
+
+            # save the last image of the evaluation for the plot
+            subplots.append(x_eval_out[0].permute(1, 2, 0))
+
             writer.add_video("eval", eval_video, it, fps=60)
+
+    # show the evolution of the image as a plot
+    ncols = len(subplots) + 1
+    fig, axs = plt.subplots(nrows=1, ncols=ncols, figsize=(ncols*10, 10), dpi=100)
+    axs = axs.ravel()
+    for i, subplot in enumerate(subplots):
+        axs[i].imshow(subplot)
+        axs[i].set_title(f"iteration {i * args.eval_frequency}")
+
+    # include the ground truth in the plot
+    axs[-1].imshow(to_rgb(target_img_)[0].permute(1, 2, 0)) # ground truth
+    axs[-1].set_title("ground truth")
+    plt.show()
 
 
 if __name__ == "__main__":
