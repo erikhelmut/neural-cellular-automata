@@ -16,9 +16,9 @@
     <a href="https://distill.pub/2020/growing-ca/"><strong>Growing Neural Cellular Automata »</strong></a>
     <br />  
     <br />
-    <a href="https://distill.pub/2020/growing-ca/">Link1</a>
+    <a href="https://github.com/jankrepl/mildlyoverfitted/tree/master/github_adventures/automata">Existing PyTorch implementation</a>
     ·
-    <a href="https://distill.pub/2020/growing-ca/">Link2</a>
+    <a href="https://medmnist.com">MedMnist</a>
   </p>
 </div>
 
