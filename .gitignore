@@ -2,4 +2,5 @@ __pychache__/
 *.pyc
 .vscode/
 .DS_Store
+logs/
 venv/
