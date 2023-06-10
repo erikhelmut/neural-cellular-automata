@@ -2,3 +2,4 @@ __pychache__/
 *.pyc
 .vscode/
 .DS_Store
+venv/
