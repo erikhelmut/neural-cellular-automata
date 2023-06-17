@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 
 
 def load_mnist_data():
-    data_flag = "chestmnist"
-    # data_flag = "breastmnist"
+    data_flag =  "bloodmnist" # "retinamnist" # "chestmnist", "breastmnist", "bloodmnist"
     download = True
 
     NUM_EPOCHS = 3
@@ -46,4 +45,4 @@ if __name__ == "__main__":
     fig.add_axes(ax)
 
     ax.imshow(train_dataset.montage(length=1), cmap="viridis")
-    fig.savefig("chest.png")
+    fig.savefig("../data/blood.png")
