@@ -2,77 +2,54 @@ import torch
 import torch.nn as nn
 
 
+# from: https://github.com/jankrepl/mildlyoverfitted/tree/master/github_adventures/automata
+# and https://distill.pub/2020/growing-ca/
 class CAModel(nn.Module):
-    """Cell automata model.
+    """Cellular automata model.
 
-    Parameters
-    ----------
-    n_channels : int
-        Number of channels of the grid.
-
-    hidden_channels : int
-        Hidden channels that are related to the pixelwise 1x1 convolution.
-
-    fire_rate : float
-        Number between 0 and 1. The lower it is the more likely it is for
-        cells to be set to zero during the `stochastic_update` process.
-
-    device : torch.device
-        Determines on what device we perfrom all the computations.
-
-    Attributes
-    ----------
-    update_module : nn.Sequential
-        The only part of the network containing trainable parameters. Composed
-        of 1x1 convolution, ReLu and 1x1 convolution.
-
-    filters : torch.Tensor
-        Constant tensor of shape `(3 * n_channels, 1, 3, 3)`.
+    n_channels : number of channels
+    hidden_channels : hidden channels
+    wait_time : waiting a random time between updates
+    device : the device we use for computation
     """
-    def __init__(self, n_channels=16, hidden_channels=128, fire_rate=0.5, device=None):
+
+    def __init__(self, n_channels=16, hidden_channels=128, wait_time=0.5, device=None):
         super().__init__()
-
-
-        self.fire_rate = 0.5
+        # initialize attributes
+        self.wait_time = wait_time
         self.n_channels = n_channels
-        self.device = device or torch.device("cpu")
 
-        # Perceive step
-        sobel_filter_ = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-        scalar = 8.0
+        if device is None:
+            self.device = torch.device("cpu")
+        else:
+            self.device = device
 
-        sobel_filter_x = sobel_filter_ / scalar
-        sobel_filter_y = sobel_filter_.t() / scalar
-        identity_filter = torch.tensor(
-                [
-                    [0, 0, 0],
-                    [0, 1, 0],
-                    [0, 0, 0],
-                ],
-                dtype=torch.float32,
-        )
+        # initialize values for perception step
+        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+        sobel_y = sobel_x.t()
+        identity_filter = torch.tensor([[0, 0, 0], [0, 1, 0], [0, 0, 0], ], dtype=torch.float32, )
+        # stack filters
         filters = torch.stack(
-                [identity_filter, sobel_filter_x, sobel_filter_y]
-        )  # (3, 3, 3)
-        filters = filters.repeat((n_channels, 1, 1))  # (3 * n_channels, 3, 3)
-        self.filters = filters[:, None, ...].to(
-                self.device
-        )  # (3 * n_channels, 1, 3, 3)
+            [identity_filter, sobel_x, sobel_y]
+        )
+        # because we have 3 * n_channels in the first update_module
+        filters = filters.repeat((n_channels, 1, 1))
+        self.filters = filters[:, None, :, :].to(self.device)
 
-        # Update step
+        # dense-128, relu, dense-16
         self.update_module = nn.Sequential(
-                nn.Conv2d(
-                    3 * n_channels,
-                    hidden_channels,
-                    kernel_size=1,  # (1, 1)
-                ),
-                nn.ReLU(),
-                nn.Conv2d(
-                    hidden_channels,
-                    n_channels,
-                    kernel_size=1,
-                    bias=False,
-                ),
+            nn.Conv2d(
+                3 * n_channels,
+                hidden_channels,
+                kernel_size=1,  # (1, 1)
+            ),
+            nn.ReLU(),
+            nn.Conv2d(
+                hidden_channels,
+                n_channels,
+                kernel_size=1,
+                bias=False,
+            ),
         )
 
         with torch.no_grad():
@@ -81,111 +58,60 @@ class CAModel(nn.Module):
         self.to(self.device)
 
     def perceive(self, x):
-        """Approximate channelwise gradient and combine with the input.
+        """Perceive information from neighboring cells
 
-        This is the only place where we include information on the
-        neighboring cells. However, we are not using any learnable
-        parameters here.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Shape `(n_samples, n_channels, grid_size, grid_size)`.
+        x : (n_samples, n_channels, grid_size, grid_size) - current grid
 
         Returns
-        -------
-        torch.Tensor
-            Shape `(n_samples, 3 * n_channels, grid_size, grid_size)`.
+        (n_samples, 3 * n_channels, grid_size, grid_size) - perceived grid
         """
         return nn.functional.conv2d(x, self.filters, padding=1, groups=self.n_channels)
 
     def update(self, x):
-        """Perform update.
+        """Update cell grid
 
-        Note that this is the only part of the forward pass that uses
-        trainable parameters
-
-        Paramters
-        ---------
-        x : torch.Tensor
-            Shape `(n_samples, 3 * n_channels, grid_size, grid_size)`.
+        x : (n_samples, 3 * n_channels, grid_size, grid_size) - current grid
 
         Returns
-        -------
-        torch.Tensor
-            Shape `(n_samples, n_channels, grid_size, grid_size)`.
+        (n_samples, n_channels, grid_size, grid_size) - updated grid
         """
-        return self.update_module(x)
+        # get living cells
+        pre_life_mask = self.get_alive(x)
 
-    @staticmethod
-    def stochastic_update(x, fire_rate):
-        """Run pixel-wise dropout.
-
-        Unlike dropout there is no scaling taking place.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Shape `(n_samples, n_channels, grid_size, grid_size)`.
-
-        fire_rate : float
-            Number between 0 and 1. The higher the more likely a given cell
-            updates.
-
-        Returns
-        -------
-        torch.Tensor
-            Shape `(n_samples, n_channels, grid_size, grid_size)`.
-        """
-        device = x.device
-
-        mask = (torch.rand(x[:, :1, :, :].shape) <= fire_rate).to(device, torch.float32)
-        return x * mask  # broadcasted over all channels
-
-    @staticmethod
-    def get_living_mask(x):
-        """Identify living cells.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Shape `(n_samples, n_channels, grid_size, grid_size)`.
-
-        Returns
-        -------
-        torch.Tensor
-            Shape `(n_samples, 1, grid_size, grid_size)` and the
-            dtype is bool.
-        """
-        return (
-            nn.functional.max_pool2d(
-                x[:, 3:4, :, :], kernel_size=3, stride=1, padding=1
-            )
-            > 0.1
-        )
-
-    def forward(self, x):
-        """Run the forward pass.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Shape `(n_samples, n_channels, grid_size, grid_size)`.
-
-        Returns
-        -------
-        torch.Tensor
-            Shape `(n_sample, n_channels, grid_size, grid_size)`.
-        """
-        pre_life_mask = self.get_living_mask(x)
-
+        # perceive step
         y = self.perceive(x)
-        dx = self.update(y)
-        dx = self.stochastic_update(dx, fire_rate=self.fire_rate)
-
+        # update step
+        dx = self.update_module(y)
+        # stochastic update
+        mask = (torch.rand(x[:, :1, :, :].shape) <= self.wait_time).to(self.device, torch.float32)
+        x = x * mask
+        # add updated value
         x = x + dx
 
-        post_life_mask = self.get_living_mask(x)
+        # check which cells are alive before and after
+        post_life_mask = self.get_alive(x)
         life_mask = (pre_life_mask & post_life_mask).to(torch.float32)
+        x = x * life_mask
+        return x
 
-        return x * life_mask
+    @staticmethod
+    def get_alive(x):
+        """Check which cells are alive
+
+        x : (n_samples, n_channels, grid_size, grid_size) - current grid
+
+        Returns
+        (n_samples, 1, grid_size, grid_size) - tensor with boolean values
+        """
+        return nn.functional.max_pool2d(x[:, 3:4, :, :], kernel_size=3, stride=1, padding=1) > 0.1
+
+    def forward(self, x):
+        """Forward pass
+
+        x : (n_samples, n_channels, grid_size, grid_size) - current grid
+
+        Returns
+        (n_sample, n_channels, grid_size, grid_size) - updated grid
+        """
+        x = self.update(x)
+        return x
