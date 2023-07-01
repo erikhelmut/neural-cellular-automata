@@ -112,7 +112,7 @@ def rgba_to_rgb(img):
     alpha = torch.clamp(img[:, 3:4, ...], 0.0, 1.0)
 
     # convert to RGB
-    img = 1.0 - alpha + rgb
+    img = torch.clamp(1.0 - alpha + rgb, 0, 1)
 
     return img
 
@@ -156,3 +156,25 @@ def make_seed(size, n_channels=16):
     x[:, 3:, size // 2, size // 2] = 1.0
 
     return x
+
+
+def L2(target, cs):
+    """
+    Calculate the L2 loss between target image and cell state.
+
+    Args:
+        target (torch.Tensor): target image of shape (batch_size, 4, size, size)
+        cs (torch.Tensor): cell state
+
+    Returns:
+        loss_batch (torch.Tensor): L2 loss for each image in batch
+        loss (torch.Tensor): L2 loss
+    """
+
+    # calculate loss for each image in batch but only take first 4 rgba channels
+    loss_batch = ((target - cs[:, :4, ...]) ** 2).mean(dim=[1, 2, 3])
+
+    # take mean over loss_batch
+    loss = loss_batch.mean()
+
+    return loss_batch, loss
