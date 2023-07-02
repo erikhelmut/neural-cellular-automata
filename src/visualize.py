@@ -6,7 +6,7 @@ import torch
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from model import CAModel
+from model import NCA 
 from helper import *
 
 
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     config = yaml.safe_load(open(args.config, "r"))
 
     # load model
-    model = CAModel(n_channels=16, device=torch.device("cpu"))
+    model = NCA(n_channels=16, filter=config["filter"], device=torch.device("cpu"))
     model.load_state_dict(torch.load(config["model_path"], map_location="cpu"))
     model.eval()
 

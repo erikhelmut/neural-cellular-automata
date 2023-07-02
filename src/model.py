@@ -4,16 +4,17 @@ import torch.nn as nn
 
 # from: https://github.com/jankrepl/mildlyoverfitted/tree/master/github_adventures/automata
 # and https://distill.pub/2020/growing-ca/
-class CAModel(nn.Module):
-    """Cellular automata model.
+class NCA(nn.Module):
+    """ Neural Cellular Automata Model.
 
     n_channels : number of channels
     hidden_channels : hidden channels
+    filter : filter used for perception step
     fire_rate : waiting a random time between updates
     device : the device we use for computation
     """
 
-    def __init__(self, n_channels=16, hidden_channels=128, fire_rate=0.5, device=None):
+    def __init__(self, n_channels=16, hidden_channels=128, filter="sobel", fire_rate=0.5, device=None):
         super().__init__()
 
         self.fire_rate = 0.5
@@ -21,11 +22,27 @@ class CAModel(nn.Module):
         self.device = device or torch.device("cpu")
 
         # Perceive step
-        sobel_filter_ = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-        scalar = 8.0
+        if filter == "sobel":
+            filter_ = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+            scalar = 8.0
+        elif filter == "scharr":
+            filter_ = torch.tensor([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]])
+            scalar = 16.0
+        elif filter == "gaussian":
+            filter_ = torch.tensor([[1, 2, 1], [2, 4, 2], [1, 2, 1]])
+            scalar = 16.0
+        elif filter == "laplacian":
+            filter_ = torch.tensor([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+            scalar = 8.0
+        elif filter == "mean":
+            filter_ = torch.tensor([[1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            scalar = 9.0
+        else:
+            raise ValueError(f"Unknown filter: {filter}")
 
-        sobel_filter_x = sobel_filter_ / scalar
-        sobel_filter_y = sobel_filter_.t() / scalar
+        filter_x = filter_ / scalar
+        filter_y = filter_.t() / scalar
+
         identity_filter = torch.tensor(
             [
                 [0, 0, 0],
@@ -35,7 +52,7 @@ class CAModel(nn.Module):
             dtype=torch.float32,
         )
         filters = torch.stack(
-            [identity_filter, sobel_filter_x, sobel_filter_y]
+            [identity_filter, filter_x, filter_y]
         )  # (3, 3, 3)
         filters = filters.repeat((n_channels, 1, 1))  # (3 * n_channels, 3, 3)
         self.filters = filters[:, None, ...].to(

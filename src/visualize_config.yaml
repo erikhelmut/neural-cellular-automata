@@ -1,7 +1,8 @@
 target_path: ../data/chest.png
-model_path: ../models/chest.pt
-ani_path: ../animations/chest.gif
+model_path: ../models/chest_sobel.pt
+ani_path: ../animations/chest_sobel.gif
 iterations: 500
 img_size: 28
 padding: 0
 n_channels: 16
+filter: sobel 

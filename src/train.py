@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
 
-from model import CAModel
+from model import NCA
 from helper import * 
 
 
@@ -66,7 +66,7 @@ def train(config):
     target_batch = target.repeat(config["batch_size"], 1, 1, 1)
 
     # initialize model and optimizer
-    model = CAModel(n_channels=config["n_channels"], device=device)
+    model = NCA(n_channels=config["n_channels"], filter=config["filter"], device=device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
 
     # initialize pool with seed cell state
