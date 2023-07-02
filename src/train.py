@@ -1,251 +1,135 @@
 import argparse
-import pathlib
+import yaml
+from tqdm import tqdm
 
 import numpy as np
 import torch
 import torch.nn as nn
-from PIL import Image
 from matplotlib import pyplot as plt
-from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
 
 from model import CAModel
+from helper import * 
 
 
-def load_image(path, size=40):
-    """Load an image.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Path to where the image is located. Note that the image needs to be
-        RGBA.
-
-    size : int
-        The image will be resized to a square wit ha side length of `size`.
-
-    Returns
-    -------
-    torch.Tensor
-        4D float image of shape `(1, 4, size, size)`. The RGB channels
-        are premultiplied by the alpha channel.
+def setup_device(device=None):
     """
-    img = Image.open(path)
-    img = img.resize((size, size), Image.ANTIALIAS)
-    img = np.float32(img) / 255.0
-    img[..., :3] *= img[..., 3:]
+    Set up device for training. If no device is specified, use cuda if available,
+        otherwise use mps or cpu.
 
-    return torch.from_numpy(img).permute(2, 0, 1)[None, ...]
+    Args:
+        device (str): device to use for training (defaults to None)
 
-
-def to_rgb(img_rgba):
-    """Convert RGBA image to RGB image.
-
-    Parameters
-    ----------
-    img_rgba : torch.Tensor
-        4D tensor of shape `(1, 4, size, size)` where the RGB channels
-        were already multiplied by the alpha.
-
-    Returns
-    -------
-    img_rgb : torch.Tensor
-        4D tensor of shape `(1, 3, size, size)`.
+    Returns:
+        device (torch.device): device to use for training
     """
-    rgb, a = img_rgba[:, :3, ...], torch.clamp(img_rgba[:, 3:, ...], 0, 1)
-    return torch.clamp(1.0 - a + rgb, 0, 1)
+
+    if device is not None:
+        device = torch.device(device)
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+
+    return device
 
 
-def make_seed(size, n_channels):
-    """Create a starting tensor for training.
-
-    The only active pixels are going to be in the middle.
-
-    Parameters
-    ----------
-    size : int
-        The height and the width of the tensor.
-
-    n_channels : int
-        Overall number of channels. Note that it needs to be higher than 4
-        since the first 4 channels represent RGBA.
-
-    Returns
-    -------
-    torch.Tensor
-        4D float tensor of shape `(1, n_chanels, size, size)`.
+def plot_loss(losses):
     """
-    x = torch.zeros((1, n_channels, size, size), dtype=torch.float32)
-    x[:, 3:, size // 2, size // 2] = 1
-    return x
+    Plot the loss.
 
+    Args:
+        losses (list): list of losses during training
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description="Training script for the Celluar Automata"
-    )
-    parser.add_argument("img", type=str, help="Path to the image we want to reproduce")
+    Returns:
+        None
+    """
 
-    parser.add_argument(
-        "-b",
-        "--batch-size",
-        type=int,
-        default=8,
-        help="Batch size. Samples will always be taken randomly from the pool."
-    )
-    parser.add_argument(
-        "-d",
-        "--device",
-        type=str,
-        default="cpu",
-        help="Device to use",
-        choices=("cpu", "cuda", "mps"),
-    )
-    parser.add_argument(
-        "-e",
-        "--eval-frequency",
-        type=int,
-        default=500,
-        help="Evaluation frequency.",
-    )
-    parser.add_argument(
-        "-i",
-        "--eval-iterations",
-        type=int,
-        default=300,
-        help="Number of iterations when evaluating.",
-    )
-    parser.add_argument(
-        "-n",
-        "--n-batches",
-        type=int,
-        default=5000,
-        help="Number of batches to train for.",
-    )
-    parser.add_argument(
-        "-c",
-        "--n-channels",
-        type=int,
-        default=16,
-        help="Number of channels of the input tensor",
-    )
-    parser.add_argument(
-        "-l",
-        "--logdir",
-        type=str,
-        default="logs",
-        help="Folder where all the logs and outputs are saved.",
-    )
-    parser.add_argument(
-        "-p",
-        "--padding",
-        type=int,
-        default=16,
-        help="Padding. The shape after padding is (h + 2 * p, w + 2 * p).",
-    )
-    parser.add_argument(
-        "--pool-size",
-        type=int,
-        default=1024,
-        help="Size of the training pool",
-    )
-    parser.add_argument(
-        "-s",
-        "--size",
-        type=int,
-        default=40,
-        help="Image size",
-    )
-    # Parse arguments
-    args = parser.parse_args()
-    print(vars(args))
-
-    # Misc
-    device = torch.device(args.device)
-
-    log_path = pathlib.Path(args.logdir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    writer = SummaryWriter(log_path)
-
-    # Target image
-    target_img_ = load_image(args.img, size=args.size)
-    p = args.padding
-    target_img_ = nn.functional.pad(target_img_, (p, p, p, p), "constant", 0)
-    target_img = target_img_.to(device)
-    target_img = target_img.repeat(args.batch_size, 1, 1, 1)
-
-    writer.add_image("ground truth", to_rgb(target_img_)[0])
-
-    # Model and optimizer
-    model = CAModel(n_channels=args.n_channels, device=device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-3)
-
-    # Pool initialization
-    seed = make_seed(args.size, args.n_channels).to(device)
-    seed = nn.functional.pad(seed, (p, p, p, p), "constant", 0)
-    pool = seed.clone().repeat(args.pool_size, 1, 1, 1)
-
-    # for storing the evaluation images
-    subplots = []
-
-    for it in tqdm(range(args.n_batches)):
-        batch_ixs = np.random.choice(
-            args.pool_size, args.batch_size, replace=False
-        ).tolist()
-
-        x = pool[batch_ixs]
-        for i in range(np.random.randint(64, 96)):
-            x = model(x)
-
-        loss_batch = ((target_img - x[:, :4, ...]) ** 2).mean(dim=[1, 2, 3])
-        loss = loss_batch.mean()
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        writer.add_scalar("train/loss", loss, it)
-
-        argmax_batch = loss_batch.argmax().item()
-        argmax_pool = batch_ixs[argmax_batch]
-        remaining_batch = [i for i in range(args.batch_size) if i != argmax_batch]
-        remaining_pool = [i for i in batch_ixs if i != argmax_pool]
-
-        pool[argmax_pool] = seed.clone()
-        pool[remaining_pool] = x[remaining_batch].detach()
-
-        if it % args.eval_frequency == 0 or it == args.n_batches - 1:
-            x_eval = seed.clone()  # (1, n_channels, size, size)
-
-            eval_video = torch.empty(1, args.eval_iterations, 3, *x_eval.shape[2:])
-
-            x_eval_out = None  # to be used for displaying in matplotlib
-            for it_eval in range(args.eval_iterations):
-                x_eval = model(x_eval)
-                x_eval_out = to_rgb(x_eval[:, :4].detach().cpu())
-                eval_video[0, it_eval] = x_eval_out
-
-            plt.imshow(x_eval_out[0].permute(1, 2, 0))
-            plt.title(f"iteration {it}")
-            plt.show()
-
-            # save the last image of the evaluation for the plot
-            subplots.append(x_eval_out[0].permute(1, 2, 0))
-
-            writer.add_video("eval", eval_video, it, fps=60)
-
-    # show the evolution of the image as a plot
-    ncols = len(subplots) + 1
-    fig, axs = plt.subplots(nrows=1, ncols=ncols, figsize=(ncols*10, 10), dpi=100)
-    axs = axs.ravel()
-    for i, subplot in enumerate(subplots):
-        axs[i].imshow(subplot)
-        axs[i].set_title(f"iteration {i * args.eval_frequency}")
-
-    # include the ground truth in the plot
-    axs[-1].imshow(to_rgb(target_img_)[0].permute(1, 2, 0)) # ground truth
-    axs[-1].set_title("ground truth")
+    plt.plot(losses)
+    plt.title("L2 Loss during training")
+    plt.xlabel("Iteration")
+    plt.ylabel("Loss")
     plt.show()
 
 
+def train(config):
+
+    # set up device
+    device = setup_device(config["device"])
+    print(f"Using device: {device}")
+
+    # load target image, pad it and repeat it batch_size times
+    target = load_image(config["target_path"], config["img_size"])
+    target = pad_image(target, config["padding"])
+    target = target.to(device)
+    target_batch = target.repeat(config["batch_size"], 1, 1, 1)
+
+    # initialize model and optimizer
+    model = CAModel(n_channels=config["n_channels"], device=device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
+
+    # initialize pool with seed cell state
+    seed = make_seed(config["img_size"], config["n_channels"])
+    seed = pad_image(seed, config["padding"])
+    seed = seed.to(device)
+    pool = seed.clone().repeat(config["pool_size"], 1, 1, 1)
+
+    losses = []
+
+    # start training loop
+    for iter in tqdm(range(config["iterations"])):
+        
+        # randomly select batch_size cell states from pool
+        batch_idxs = np.random.choice(
+            config["pool_size"], config["batch_size"], replace=False
+        ).tolist()
+
+        # select batch_size cell states from pool
+        cs = pool[batch_idxs]
+
+        # run model for random number of iterations 
+        for i in range(np.random.randint(64, 96)):
+            cs = model(cs)
+
+        # calculate loss for each image in batch
+        loss_batch, loss = L2(target_batch, cs)
+        losses.append(loss.item())
+
+        # backpropagate loss
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        # index of cell state with highest loss in batch
+        argmax_batch = loss_batch.argmax().item()
+        # index of cell state with highest loss in pool
+        argmax_pool = batch_idxs[argmax_batch]
+        # indices of cell states in batch that are not the cell state with highest loss
+        remaining_batch = [i for i in range(config["batch_size"]) if i != argmax_batch]
+        # indices of cell states in pool that are not the cell state with highest loss
+        remaining_pool = [i for i in batch_idxs if i != argmax_pool]
+        # replace cell state with highest loss in pool with seed image
+        pool[argmax_pool] = seed.clone()
+        # update cell states of selected batch with cell states from model output
+        pool[remaining_pool] = cs[remaining_batch].detach()
+
+    # save model
+    torch.save(model.state_dict(), config["model_path"])
+
+    # plot loss
+    plot_loss(losses)
+
+
 if __name__ == "__main__":
-    main()
+    
+    # parse arguments
+    parser = argparse.ArgumentParser(description="Train a NCA model.")
+    parser.add_argument("-c", "--config", type=str, default="train_config.yaml", help="Path to config file.")
+    args = parser.parse_args()
+
+    # load config file
+    config = yaml.safe_load(open(args.config, "r"))
+
+    # train model
+    train(config)

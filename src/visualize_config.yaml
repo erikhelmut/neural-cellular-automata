@@ -1,0 +1,7 @@
+target_path: ../data/chest.png
+model_path: ../models/chest.pt
+ani_path: ../animations/chest.gif
+iterations: 500
+img_size: 28
+padding: 0
+n_channels: 16

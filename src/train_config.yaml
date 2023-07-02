@@ -1,0 +1,10 @@
+target_path: ../data/chest.png
+model_path: ../models/chest.pt
+device: mps
+iterations: 1000
+learning_rate: 0.002
+img_size: 28
+padding: 0
+n_channels: 16
+batch_size: 8
+pool_size: 1024
