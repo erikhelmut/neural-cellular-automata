@@ -1,7 +1,7 @@
 target_path: ../data/chest.png
 model_path: ../models/chest.pt
 device: mps
-iterations: 2000
+iterations: 1000
 learning_rate: 0.002
 img_size: 28
 padding: 0

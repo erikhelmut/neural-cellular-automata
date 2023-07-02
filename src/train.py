@@ -1,11 +1,11 @@
 import argparse
 import yaml
+from tqdm import tqdm
 
 import numpy as np
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-from tqdm import tqdm
 
 from model import CAModel
 from helper import * 
@@ -85,15 +85,15 @@ def train(config):
             config["pool_size"], config["batch_size"], replace=False
         ).tolist()
 
-        # select batch_size images from pool
-        x = pool[batch_idxs]
+        # select batch_size cell states from pool
+        cs = pool[batch_idxs]
 
         # run model for random number of iterations 
         for i in range(np.random.randint(64, 96)):
-            x = model(x)
+            cs = model(cs)
 
         # calculate loss for each image in batch
-        loss_batch, loss = L2(target_batch, x[:, :4, ...])
+        loss_batch, loss = L2(target_batch, cs)
         losses.append(loss.item())
 
         # backpropagate loss
@@ -112,7 +112,7 @@ def train(config):
         # replace cell state with highest loss in pool with seed image
         pool[argmax_pool] = seed.clone()
         # update cell states of selected batch with cell states from model output
-        pool[remaining_pool] = x[remaining_batch].detach()
+        pool[remaining_pool] = cs[remaining_batch].detach()
 
     # save model
     torch.save(model.state_dict(), config["model_path"])
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     
     # parse arguments
     parser = argparse.ArgumentParser(description="Train a NCA model.")
-    parser.add_argument("-c", "--config", type=str, default="config.yaml", help="Path to config file.")
+    parser.add_argument("-c", "--config", type=str, default="train_config.yaml", help="Path to config file.")
     args = parser.parse_args()
 
     # load config file
