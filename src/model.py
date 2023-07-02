@@ -9,34 +9,40 @@ class CAModel(nn.Module):
 
     n_channels : number of channels
     hidden_channels : hidden channels
-    wait_time : waiting a random time between updates
+    fire_rate : waiting a random time between updates
     device : the device we use for computation
     """
 
-    def __init__(self, n_channels=16, hidden_channels=128, wait_time=0.5, device=None):
+    def __init__(self, n_channels=16, hidden_channels=128, fire_rate=0.5, device=None):
         super().__init__()
-        # initialize attributes
-        self.wait_time = wait_time
+
+        self.fire_rate = 0.5
         self.n_channels = n_channels
+        self.device = device or torch.device("cpu")
 
-        if device is None:
-            self.device = torch.device("cpu")
-        else:
-            self.device = device
+        # Perceive step
+        sobel_filter_ = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+        scalar = 8.0
 
-        # initialize values for perception step
-        sobel_x = torch.tensor([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
-        sobel_y = sobel_x.t()
-        identity_filter = torch.tensor([[0, 0, 0], [0, 1, 0], [0, 0, 0], ], dtype=torch.float32, )
-        # stack filters
-        filters = torch.stack(
-            [identity_filter, sobel_x, sobel_y]
+        sobel_filter_x = sobel_filter_ / scalar
+        sobel_filter_y = sobel_filter_.t() / scalar
+        identity_filter = torch.tensor(
+            [
+                [0, 0, 0],
+                [0, 1, 0],
+                [0, 0, 0],
+            ],
+            dtype=torch.float32,
         )
-        # because we have 3 * n_channels in the first update_module
-        filters = filters.repeat((n_channels, 1, 1))
-        self.filters = filters[:, None, :, :].to(self.device)
+        filters = torch.stack(
+            [identity_filter, sobel_filter_x, sobel_filter_y]
+        )  # (3, 3, 3)
+        filters = filters.repeat((n_channels, 1, 1))  # (3 * n_channels, 3, 3)
+        self.filters = filters[:, None, ...].to(
+            self.device
+        )  # (3 * n_channels, 1, 3, 3)
 
-        # dense-128, relu, dense-16
+        # Update step
         self.update_module = nn.Sequential(
             nn.Conv2d(
                 3 * n_channels,
@@ -83,16 +89,16 @@ class CAModel(nn.Module):
         # update step
         dx = self.update_module(y)
         # stochastic update
-        mask = (torch.rand(x[:, :1, :, :].shape) <= self.wait_time).to(self.device, torch.float32)
-        x = x * mask
+        device = dx.device
+        mask = (torch.rand(x[:, :1, :, :].shape) <= self.fire_rate).to(device, torch.float32)
+        dx = dx * mask
         # add updated value
-        x = x + dx
+        new_x = x + dx
 
         # check which cells are alive before and after
-        post_life_mask = self.get_alive(x)
+        post_life_mask = self.get_alive(new_x)
         life_mask = (pre_life_mask & post_life_mask).to(torch.float32)
-        x = x * life_mask
-        return x
+        return new_x * life_mask
 
     @staticmethod
     def get_alive(x):
@@ -103,7 +109,7 @@ class CAModel(nn.Module):
         Returns
         (n_samples, 1, grid_size, grid_size) - tensor with boolean values
         """
-        return nn.functional.max_pool2d(x[:, 3:4, :, :], kernel_size=3, stride=1, padding=1) > 0.1
+        return (nn.functional.max_pool2d(x[:, 3:4, :, :], kernel_size=3, stride=1, padding=1) > 0.1)
 
     def forward(self, x):
         """Forward pass
@@ -113,5 +119,4 @@ class CAModel(nn.Module):
         Returns
         (n_sample, n_channels, grid_size, grid_size) - updated grid
         """
-        x = self.update(x)
-        return x
+        return self.update(x)
