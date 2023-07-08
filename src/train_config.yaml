@@ -1,6 +1,6 @@
 target_path: ../data/chest.png
 model_path: ../models/chest/L2/chest_sobel.pt
-device: mps
+device: cpu
 iterations: 1000
 learning_rate: 0.002
 img_size: 28
