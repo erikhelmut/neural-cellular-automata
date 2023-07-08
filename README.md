@@ -69,15 +69,23 @@ $ git clone git@github.com:erikhelmut/neural-cellular-automata.git
 $ cd neural-cellular-automata
 ```
 
-#### Step 2: Create conda environment & install the dependencies
+#### Step 2: Create conda environment
 ```
 $ conda create --name nca python=3.11
 $ conda activate nca
-$ pip install -r requirements.txt
+```
+
+#### Step 3: Install dependencies
+```
+$ conda install -r requirements.txt
 ```
 
 <!-- USAGE -->
 ## Usage
 
+
 <!-- CONTACTS -->
 ## Contacts
+* Erik Helmut - [erikhelmut](https://github.com/erikhelmut)
+* Darya Nikitina - [mewmiyu](https://github.com/mewmiyu)
+* Moritz Meser - []()
