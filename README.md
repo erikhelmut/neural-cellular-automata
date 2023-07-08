@@ -16,7 +16,7 @@
     <a href="https://distill.pub/2020/growing-ca/"><strong>Growing Neural Cellular Automata »</strong></a>
     <br />  
     <br />
-    <a href="https://github.com/jankrepl/mildlyoverfitted/tree/master/github_adventures/automata">Existing PyTorch implementation</a>
+    <a href="https://www.youtube.com/watch?v=21ACbWoF2Oo">NCA PyTorch Walkthrough</a>
     ·
     <a href="https://medmnist.com">MedMnist</a>
   </p>
