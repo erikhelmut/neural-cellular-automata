@@ -5,7 +5,7 @@
 <br />
 <div align="center">
   <a href="https://distill.pub/2020/growing-ca/">
-    <img src="animations/chest/L2/chest_sobel.gif" alt="chest" height="150">
+    <img src="animations/chest/L2/chest_sobel.gif" alt="chest" height="150" width="150">
   </a>
 
   <h3 align="center">Unleashing emergent behavior through neural network and cellular automata fusion.</h3>
