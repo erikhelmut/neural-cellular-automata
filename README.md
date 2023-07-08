@@ -94,7 +94,7 @@ $ conda activate nca
 
 #### Step 3: Install dependencies
 ```
-$ conda install -r requirements.txt
+$ pip install -r requirements.txt
 ```
 
 
