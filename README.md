@@ -88,4 +88,4 @@ $ conda install -r requirements.txt
 ## Contacts
 * Erik Helmut - [erikhelmut](https://github.com/erikhelmut)
 * Darya Nikitina - [mewmiyu](https://github.com/mewmiyu)
-* Moritz Meser - []()
+* Moritz Meser - [MoritzMeser](https://github.com/MoritzMeser)
