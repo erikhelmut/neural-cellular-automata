@@ -51,7 +51,15 @@ if __name__ == "__main__":
         frames.append([frame])
 
     # print final loss
-    loss, _ = L2(target_img, cs)
+    if config["loss"] == "L1":
+        loss, _ = L1(target_img, cs)
+    elif config["loss"] == "L2":
+        loss, _ = L2(target_img, cs)
+    elif config["loss"] == "Manhattan":
+        loss, _ = Manhattan(target_img, cs)
+    elif config["loss"] == "Hinge":
+        loss, _ = Hinge(target_img, cs)
+
     print("Final loss: {:.4f}".format(loss.item()))
 
     # save animation

@@ -47,7 +47,7 @@ def plot_loss(losses):
     """
 
     plt.plot(losses)
-    plt.title("L2 Loss during training")
+    plt.title("Loss during training")
     plt.xlabel("Iteration")
     plt.ylabel("Loss")
     plt.show()
@@ -93,7 +93,15 @@ def train(config):
             cs = model(cs)
 
         # calculate loss for each image in batch
-        loss_batch, loss = L2(target_batch, cs)
+        if config["loss"] == "L1":
+            loss_batch, loss = L1(target_batch, cs)
+        elif config["loss"] == "L2":
+            loss_batch, loss = L2(target_batch, cs)
+        elif config["loss"] == "Manhattan":
+            loss_batch, loss = Manhattan(target_batch, cs)
+        elif config["loss"] == "Hinge":
+            loss_batch, loss = Hinge(target_batch, cs)
+
         losses.append(loss.item())
 
         # backpropagate loss

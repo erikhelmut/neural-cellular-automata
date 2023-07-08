@@ -158,6 +158,28 @@ def make_seed(size, n_channels=16):
     return x
 
 
+def L1(target, cs):
+    """
+    Calculate the L1 loss between target image and cell state.
+
+    Args:
+        target (torch.Tensor): target image of shape (batch_size, 4, size, size)
+        cs (torch.Tensor): cell state
+
+    Returns:
+        loss_batch (torch.Tensor): L1 loss for each image in batch
+        loss (torch.Tensor): L1 loss
+    """
+
+    # calculate loss for each image in batch but only take first 4 rgba channels
+    loss_batch = (torch.abs(target - cs[:, :4, ...])).mean(dim=[1, 2, 3])
+
+    # take mean over loss_batch
+    loss = loss_batch.mean()
+
+    return loss_batch, loss
+
+
 def L2(target, cs):
     """
     Calculate the L2 loss between target image and cell state.
@@ -173,6 +195,50 @@ def L2(target, cs):
 
     # calculate loss for each image in batch but only take first 4 rgba channels
     loss_batch = ((target - cs[:, :4, ...]) ** 2).mean(dim=[1, 2, 3])
+
+    # take mean over loss_batch
+    loss = loss_batch.mean()
+
+    return loss_batch, loss
+
+
+def Manhattan(target, cs):
+    """
+    Calculate the Manhattan loss between target image and cell state.
+
+    Args:
+        target (torch.Tensor): target image of shape (batch_size, 4, size, size)
+        cs (torch.Tensor): cell state
+
+    Returns:
+        loss_batch (torch.Tensor): Manhattan loss for each image in batch
+        loss (torch.Tensor): Manhatten loss
+    """
+
+    # calculate loss for each image in batch but only take first 4 rgba channels
+    loss_batch = (torch.abs(target - cs[:, :4, ...])).sum(dim=[1, 2, 3])
+
+    # take mean over loss_batch
+    loss = loss_batch.mean()
+
+    return loss_batch, loss
+
+
+def Hinge(target, cs):
+    """
+    Calculate the Hinge loss between target image and cell state.
+
+    Args:
+        target (torch.Tensor): target image of shape (batch_size, 4, size, size)
+        cs (torch.Tensor): cell state
+
+    Returns:
+        loss_batch (torch.Tensor): Hinge loss for each image in batch
+        loss (torch.Tensor): Hinge loss
+    """
+
+    # calculate loss for each image in batch but only take first 4 rgba channels
+    loss_batch = torch.max(torch.abs(target - cs[:, :4, ...]) - 0.5, torch.zeros_like(target)).mean(dim=[1, 2, 3])
 
     # take mean over loss_batch
     loss = loss_batch.mean()
