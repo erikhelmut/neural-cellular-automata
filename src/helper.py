@@ -137,7 +137,7 @@ def pad_image(img, p=0):
 def make_seed(size, n_channels=16):
     """
     Initialize the grid with zeros, except a single seed cell in the center, 
-        which will have all channels except RGB 2 set to one.
+        which will have all channels except RGB set to one.
 
     Args:
         size (int): size of the image
