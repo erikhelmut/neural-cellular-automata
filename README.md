@@ -84,7 +84,7 @@ $ conda install -r requirements.txt
 
 <!-- USAGE -->
 ## Usage
-We provide a set of tools for training and visualizing the NCA model. The following sections describe how to use them.
+We provide a set of tools for training and visualizing the NCA model. The following sections describe how to use them in detail.
 
 ### Training
 To train the NCA model, run the following command:
