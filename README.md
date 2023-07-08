@@ -43,6 +43,14 @@
     </li>
     <li>
       <a href="#usage">Usage</a>
+      <ol>
+        <li>
+          <a href="#training">Training</a>
+        </li>
+        <li>
+          <a href="#visualizing">Visualizing</a>
+        </li>
+      </ol>
     </li>
     <li>
       <a href="#contacts">Contacts</a>
