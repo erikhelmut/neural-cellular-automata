@@ -4,7 +4,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://distill.pub/2020/growing-ca/">
+  <a href="https://github.com/erikhelmut/neural-cellular-automata/blob/main/animations/chest/L2/chest_sobel.gif">
     <img src="animations/chest/L2/chest_sobel.gif" alt="chest" height="150" width="150">
   </a>
 
