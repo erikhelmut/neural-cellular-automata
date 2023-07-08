@@ -50,6 +50,11 @@ if __name__ == "__main__":
         frame = ax.imshow(rgba_to_rgb(cs[:, :4].detach().cpu())[0].permute(1, 2, 0), animated=True) 
         frames.append([frame])
 
+        # damage cell states if config["damage"] is True
+        if config["damage"] and i % (config["iterations"] / 10) == 0 and i != 0:
+            damage = 1.0 - make_circle_masks(config["img_size"])
+            cs *= damage
+
     # print final loss
     if config["loss"] == "L1":
         loss, _ = L1(target_img, cs)

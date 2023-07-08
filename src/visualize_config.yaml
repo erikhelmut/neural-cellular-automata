@@ -1,9 +1,10 @@
 target_path: ../data/chest.png
-model_path: ../models/chest/L2/chest_sobel.pt
-ani_path: ../animations/chest/L2/chest_sobel.gif
+model_path: ../models/chest/L2/chest_sobel_damage.pt
+ani_path: ../animations/chest/L2/chest_sobel_damage.gif
 iterations: 500
 img_size: 28
 padding: 0
 n_channels: 16
 filter: sobel
 loss: L2
+damage: True

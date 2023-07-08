@@ -158,6 +158,32 @@ def make_seed(size, n_channels=16):
     return x
 
 
+def make_circle_masks(size):
+    """
+    Make circle masks of size (size, size) with random center and radius.
+
+    Args:
+        size (int): size of the image
+
+    Returns:
+        mask (torch.Tensor): circle masks of shape (1, size, size)
+    """
+
+    # create grid
+    x = torch.linspace(-1.0, 1.0, size).unsqueeze(0).unsqueeze(0)
+    y = torch.linspace(-1.0, 1.0, size).unsqueeze(1).unsqueeze(0)
+    
+    # intialize random center and radius
+    center = torch.rand(2, 1, 1, 1).uniform_(-0.5, 0.5)
+    r = torch.rand(1, 1, 1).uniform_(0.1, 0.4)
+
+    # calculate mask
+    x, y = (x - center[0]) / r, (y - center[1]) / r
+    mask = (x * x + y * y < 1.0).float()
+
+    return mask
+
+
 def L1(target, cs):
     """
     Calculate the L1 loss between target image and cell state.

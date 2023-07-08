@@ -122,6 +122,20 @@ def train(config):
         # update cell states of selected batch with cell states from model output
         pool[remaining_pool] = cs[remaining_batch].detach()
 
+        # damage cell states in batch if config["damage"] is True
+        if config["damage"]:
+            # get indicies of the 3 best losses in batch
+            best_idxs_batch = np.argsort(loss_batch.detach().cpu().numpy())[:3]
+            # get the corresponding indicies in the pool
+            best_idxs_pool = [batch_idxs[i] for i in best_idxs_batch]
+
+            # replace the 3 best cell states in the batch with damaged versions of themselves
+            for n in range(3):
+                # create damage mask
+                damage = 1.0 - make_circle_masks(config["img_size"]).to(device)
+                # apply damage mask to cell state
+                pool[best_idxs_pool[n]] *= damage
+
     # save model
     torch.save(model.state_dict(), config["model_path"])
 
